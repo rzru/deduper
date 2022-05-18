@@ -19,11 +19,11 @@ struct Cli {
     /// Path to directory
     path: String,
 
-    /// Should also process inner directories (default = false)
+    /// Process inner directories (default = false)
     #[clap(short, long)]
     recursive: bool,
 
-    /// Delete duplicate file even if files in different directories (default = false)
+    /// Delete duplicate files even if they are in different directories (default = false)
     #[clap(short, long)]
     ignore_dir: bool,
 }

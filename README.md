@@ -17,9 +17,9 @@ ARGS:
 
 OPTIONS:
     -h, --help          Print help information
-    -i, --ignore-dir    Delete duplicate file even if files in different directories (default =
+    -i, --ignore-dir    Delete duplicate files even if they are in different directories (default =
                         false)
-    -r, --recursive     Should also process inner directories (default = false)
+    -r, --recursive     Process inner directories (default = false)
     -V, --version       Print version information
 ```
 
