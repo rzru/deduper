@@ -16,7 +16,16 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[clap(about = "Deletes duplicated files in chosen folder")]
 #[clap(version, long_about = None)]
 struct Cli {
+    /// Path to directory
     path: String,
+
+    /// Should also process inner directories (default = false)
+    #[clap(short, long)]
+    recursive: bool,
+
+    /// Delete duplicate file even if files in different directories (default = false)
+    #[clap(short, long)]
+    ignore_dir: bool,
 }
 
 fn main() {
@@ -29,39 +38,55 @@ fn main() {
         process::exit(1);
     }
 
-    print_bold(format!("Successfully removed {} files", result.unwrap()));
+    let result = result.unwrap();
+    print_bold(format!("Successfully removed {} files:", result.len()));
+    result.iter().for_each(|path| {
+        print_bold(format!("{:?}", path));
+    });
 }
 
-fn run_app(config: Cli) -> Result<u64, Error> {
-    let mut delete_count = 0;
+fn run_app(config: Cli) -> Result<Vec<PathBuf>, Error> {
+    let mut deleted = vec![];
+    let mut directories = vec![PathBuf::from(config.path)];
     let mut checksums: HashMap<u32, PathBuf> = HashMap::new();
-    let count = fs::read_dir(&config.path)?.count() as u64;
 
-    print_bold(format!("Processing {} files", count));
-    let progress_bar = get_progress(count);
+    while let Some(dir) = directories.pop() {
+        let count = fs::read_dir(&dir)?.count() as u64;
 
-    for entry in fs::read_dir(config.path)? {
-        let path = entry?.path();
-        if metadata(&path)?.is_dir() {
+        print_bold(format!("Processing {} files in {:?}", count, &dir));
+        let progress_bar = get_progress(count);
+
+        for entry in fs::read_dir(dir)? {
+            let path = entry?.path();
+            if metadata(&path)?.is_dir() {
+                progress_bar.inc(1);
+                if config.recursive {
+                    directories.insert(0, path);
+                }
+
+                continue;
+            }
+
+            let buf = fs::read(&path)?;
+            let checksum = crc32fast::hash(&buf);
+
+            if let Some(_) = checksums.get(&checksum) {
+                fs::remove_file(&path)?;
+                deleted.push(path);
+            } else {
+                checksums.insert(checksum, path);
+            }
             progress_bar.inc(1);
-            continue;
         }
 
-        let buf = fs::read(&path)?;
-        let checksum = crc32fast::hash(&buf);
-
-        if let Some(_) = checksums.get(&checksum) {
-            fs::remove_file(&path)?;
-            delete_count += 1;
-            print_bold(format!("Successfully removed duplicate: {:?}", path));
-        } else {
-            checksums.insert(checksum, path);
+        if !config.ignore_dir {
+            checksums = HashMap::new();
         }
-        progress_bar.inc(1);
+
+        progress_bar.finish();
     }
 
-    progress_bar.finish();
-    Ok(delete_count)
+    Ok(deleted)
 }
 
 fn get_progress(count: u64) -> ProgressBar {
