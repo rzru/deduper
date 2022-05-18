@@ -6,13 +6,9 @@ use std::{
     process,
 };
 
+use ansi_term::{Colour::Red, Style};
 use clap::Parser;
 use indicatif::{ProgressBar, ProgressStyle};
-
-extern crate pretty_env_logger;
-
-#[macro_use]
-extern crate log;
 
 #[derive(Parser)]
 #[clap(name = "dedup")]
@@ -25,24 +21,23 @@ struct Cli {
 
 fn main() {
     let cli = Cli::parse();
-    pretty_env_logger::init();
 
     let result = run_app(cli);
 
     if let Err(error) = result {
-        error!("Error: {}", error);
+        eprintln!("{}: {}", Red.bold().paint("ERROR"), error);
         process::exit(1);
     }
 
-    info!("Successfully removed {} files", result.unwrap());
+    print_bold(format!("Successfully removed {} files", result.unwrap()));
 }
 
-fn run_app(config: Cli) -> Result<u32, Error> {
+fn run_app(config: Cli) -> Result<u64, Error> {
     let mut delete_count = 0;
     let mut checksums: HashMap<u32, PathBuf> = HashMap::new();
     let count = fs::read_dir(&config.path)?.count() as u64;
 
-    info!("Processing {} files", count);
+    print_bold(format!("Processing {} files", count));
     let progress_bar = get_progress(count);
 
     for entry in fs::read_dir(config.path)? {
@@ -58,7 +53,7 @@ fn run_app(config: Cli) -> Result<u32, Error> {
         if let Some(_) = checksums.get(&checksum) {
             fs::remove_file(&path)?;
             delete_count += 1;
-            info!("Successfully removed duplicate: {:?}", path);
+            print_bold(format!("Successfully removed duplicate: {:?}", path));
         } else {
             checksums.insert(checksum, path);
         }
@@ -79,4 +74,8 @@ fn get_progress(count: u64) -> ProgressBar {
     progress_bar.set_style(sty);
 
     progress_bar
+}
+
+fn print_bold(text: String) {
+    println!("{}", Style::new().bold().paint(format!("> {}", text)));
 }
